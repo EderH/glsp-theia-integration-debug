@@ -38,8 +38,8 @@
     "@theia/workspace": "1.0.0",
     "@theia/markers": "1.0.0",
     "sprotty-theia": "next",
-    "@eclipse-glsp/client": "C:/Users/Public/eclipse-glsp/glsp-client",
-    "@glsp/theia-debug-diagram": "C:/Users/Public/eclipse-glsp/theia-debug-glsp-diagram"
+    "@eclipse-glsp/client": "0.7.1",
+    "@glsp/theia-debug-diagram": "0.1.0"
   },
   "resolutions": {
     "@theia/application-manager": "1.0.0",
