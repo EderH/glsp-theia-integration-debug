@@ -16,24 +16,30 @@
 import {
     Action,
     ActionHandlerRegistry,
+    AddBreakpointAction,
     ComputedBoundsAction,
     isServerMessageAction,
+    isSetEditModeAction,
+    ModelSource,
     registerDefaultGLSPServerActions,
+    RemoveBreakpointAction,
     ServerMessageAction,
     SetEditModeAction,
-    SourceUriAware,
-    isSetEditModeAction
+    SourceUriAware
 } from "@eclipse-glsp/client";
 import { Emitter, Event } from "@theia/core/lib/common";
 import { injectable } from "inversify";
 import { TheiaDiagramServer } from "sprotty-theia";
 
 import { GLSPTheiaSprottyConnector } from "./glsp-theia-sprotty-connector";
+
+
 const receivedFromServerProperty = '__receivedFromServer';
 @injectable()
-export class GLSPTheiaDiagramServer extends TheiaDiagramServer implements DirtyStateNotifier, SourceUriAware {
+export class GLSPTheiaDiagramServer extends TheiaDiagramServer implements DirtyStateNotifier, SourceUriAware, NotifyingModelSource {
 
     readonly dirtyStateChangeEmitter: Emitter<DirtyState> = new Emitter<DirtyState>();
+    readonly handledActionEventEmitter: Emitter<Action> = new Emitter<Action>();
 
     protected dirtyState: DirtyState = { isDirty: false };
 
@@ -45,6 +51,10 @@ export class GLSPTheiaDiagramServer extends TheiaDiagramServer implements DirtyS
 
     public getSourceURI(): string {
         return this.sourceUri;
+    }
+
+    get onHandledAction(): Event<Action> {
+        return this.handledActionEventEmitter.event;
     }
 
     get onDirtyStateChange(): Event<DirtyState> {
@@ -61,6 +71,10 @@ export class GLSPTheiaDiagramServer extends TheiaDiagramServer implements DirtyS
     handleLocally(action: Action): boolean {
         if (isSetDirtyStateAction(action)) {
             this.setDirty(action.isDirty);
+            return false;
+        }
+        if (isGLSPBreakpointAction(action)) {
+            this.handledActionEventEmitter.fire(action);
             return false;
         }
         if (isServerMessageAction(action)) {
@@ -107,5 +121,19 @@ export interface DirtyStateNotifier {
 export namespace DirtyStateNotifier {
     export function is(arg: any): arg is DirtyStateNotifier {
         return !!arg && ('onDirtyStateChange' in arg);
+    }
+}
+
+export function isGLSPBreakpointAction(action: Action): boolean {
+    return AddBreakpointAction.KIND === action.kind || RemoveBreakpointAction.KIND === action.kind;
+}
+
+export interface NotifyingModelSource extends ModelSource {
+    readonly onHandledAction: Event<Action>;
+}
+
+export namespace NotifyingModelSource {
+    export function is(arg: any): arg is NotifyingModelSource {
+        return !!arg && ('onHandledAction' in arg);
     }
 }

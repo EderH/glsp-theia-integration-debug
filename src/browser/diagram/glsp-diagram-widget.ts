@@ -14,6 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 import {
+    AddBreakpointAction,
     DiagramServer,
     EditorContextService,
     EnableToolPaletteAction,
@@ -21,12 +22,15 @@ import {
     IActionDispatcher,
     ICopyPasteHandler,
     ModelSource,
+    RemoveBreakpointAction,
     RequestModelAction,
     RequestTypeHintsAction,
     SaveModelAction,
     SetEditModeAction,
+    SModelElement,
     TYPES
 } from "@eclipse-glsp/client";
+import { GLSPBreakpoint } from "@glsp/theia-debug-diagram/lib/browser/breakpoint/glsp-breakpoint-marker";
 import { Message } from "@phosphor/messaging/lib";
 import { Saveable, SaveableSource } from "@theia/core/lib/browser";
 import { Disposable, DisposableCollection, Emitter, Event, MaybePromise } from "@theia/core/lib/common";
@@ -35,12 +39,16 @@ import { Container } from "inversify";
 import { DiagramWidget, DiagramWidgetOptions, TheiaSprottyConnector } from "sprotty-theia";
 
 import { GLSPWidgetOpenerOptions, GLSPWidgetOptions } from "./glsp-diagram-manager";
-import { DirtyStateNotifier, GLSPTheiaDiagramServer } from "./glsp-theia-diagram-server";
+import { DirtyStateNotifier, GLSPTheiaDiagramServer, NotifyingModelSource } from "./glsp-theia-diagram-server";
+import { GLSPTheiaSprottyConnector } from "./glsp-theia-sprotty-connector";
+
 
 export class GLSPDiagramWidget extends DiagramWidget implements SaveableSource {
 
     protected copyPasteHandler?: ICopyPasteHandler;
     saveable = new SaveableGLSPModelSource(this.actionDispatcher, this.diContainer.get<ModelSource>(TYPES.ModelSource));
+    breakpointService = new GLSPBreakpointService(this.actionDispatcher, this.diContainer.get<ModelSource>(TYPES.ModelSource), this, this.connector as GLSPTheiaSprottyConnector);
+
     options: DiagramWidgetOptions & GLSPWidgetOptions;
     constructor(options: DiagramWidgetOptions & GLSPWidgetOpenerOptions, readonly widgetId: string, readonly diContainer: Container,
         readonly editorPreferences: EditorPreferences, readonly connector?: TheiaSprottyConnector) {
@@ -188,5 +196,64 @@ export class SaveableGLSPModelSource implements Saveable, Disposable {
     dispose(): void {
         this.autoSaveJobs.dispose();
         this.dirtyChangedEmitter.dispose();
+    }
+}
+
+export class GLSPBreakpointService {
+
+    private glspBreakpoints: GLSPBreakpoint[] = [];
+    readonly breakpointsChangedEmitter: Emitter<void> = new Emitter<void>();
+
+    constructor(
+        readonly actionDispather: IActionDispatcher,
+        readonly modelSource: ModelSource,
+        readonly diagramWidget: GLSPDiagramWidget,
+        readonly connector?: GLSPTheiaSprottyConnector
+    ) {
+
+        if (NotifyingModelSource.is(this.modelSource)) {
+            const notifyingModelSource = this.modelSource as NotifyingModelSource;
+            notifyingModelSource.onHandledAction((action) => {
+                if (action.kind === AddBreakpointAction.KIND) {
+                    this.addBreakpoint(action.selectedElements);
+                } else if (action.kind === RemoveBreakpointAction.KIND) {
+                    this.removeBreakpoint(action.selectedElements);
+                }
+
+            });
+        }
+        this.onBreakpointsChanged(() => {
+            if (connector) {
+                connector.sendBreakpoints(this.diagramWidget.uri.path.toString(), this.getGLSPBreakpoints());
+            }
+        });
+    }
+
+    get onBreakpointsChanged(): Event<void> {
+        return this.breakpointsChangedEmitter.event;
+    }
+
+    protected addBreakpoint(selectedElements: SModelElement[]) {
+        for (const selectedElement of selectedElements) {
+            const breakpoint = this.glspBreakpoints.find(bp => bp.element.id === selectedElement.id);
+            if (!breakpoint) {
+                const path = this.diagramWidget.uri.path.toString()
+                if (path) {
+                    this.glspBreakpoints.push(GLSPBreakpoint.create(path, selectedElement));
+                }
+            }
+        }
+        this.breakpointsChangedEmitter.fire();
+    }
+
+    protected removeBreakpoint(selectedElements: SModelElement[]) {
+        for (const selectedElement of selectedElements) {
+            this.glspBreakpoints = this.glspBreakpoints.filter(bp => bp.element.id !== selectedElement.id);
+        }
+        this.breakpointsChangedEmitter.fire();
+    }
+
+    protected getGLSPBreakpoints(): GLSPBreakpoint[] {
+        return this.glspBreakpoints;
     }
 }

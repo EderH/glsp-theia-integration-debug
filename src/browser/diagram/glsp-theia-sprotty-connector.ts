@@ -21,6 +21,8 @@ import {
     ServerMessageAction,
     ServerStatusAction
 } from "@eclipse-glsp/client";
+import { GLSPBreakpointManager } from "@glsp/theia-debug-diagram/lib/browser/breakpoint/glsp-breakpoint-manager";
+import { GLSPBreakpoint } from "@glsp/theia-debug-diagram/lib/browser/breakpoint/glsp-breakpoint-marker";
 import { MessageService } from "@theia/core";
 import { ConfirmDialog, WidgetManager } from "@theia/core/lib/browser";
 import { Message, MessageType } from "@theia/core/lib/common";
@@ -38,7 +40,8 @@ export interface GLSPTheiaSprottyConnectorServices {
     readonly widgetManager: WidgetManager,
     readonly diagramManager: DiagramManager,
     readonly messageService: MessageService,
-    readonly notificationManager: GLSPNotificationManager
+    readonly notificationManager: GLSPNotificationManager,
+    readonly breakpointManager: GLSPBreakpointManager,
 }
 
 const SHOW_DETAILS_LABEL = 'Show details';
@@ -55,6 +58,7 @@ export class GLSPTheiaSprottyConnector implements TheiaSprottyConnector, GLSPThe
     readonly diagramManager: DiagramManager;
     readonly messageService: MessageService;
     readonly notificationManager: GLSPNotificationManager;
+    readonly breakpointManager: GLSPBreakpointManager;
 
     constructor(services: GLSPTheiaSprottyConnectorServices) {
         Object.assign(this, services);
@@ -74,6 +78,10 @@ export class GLSPTheiaSprottyConnector implements TheiaSprottyConnector, GLSPThe
 
     save(uri: string, action: ExportSvgAction): void {
         this.fileSaver.save(uri, action);
+    }
+
+    sendBreakpoints(uri: string, breakpoints: GLSPBreakpoint[]) {
+        this.breakpointManager.setGLSPBreakpoints(uri, breakpoints);
     }
 
     // Status

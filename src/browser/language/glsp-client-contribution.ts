@@ -32,6 +32,7 @@ import { InitializeParameters } from "../../common";
 import { GLSPClientFactory } from "./glsp-client";
 import { GLSPClient, GLSPClientOptions } from "./glsp-client-services";
 
+
 export const GLSPClientContribution = Symbol.for('GLSPClientContribution');
 
 export interface GLSPClientContribution extends LanguageContribution {
@@ -203,7 +204,7 @@ export abstract class BaseGLSPClientContribution implements GLSPClientContributi
         );
     }
 
-    protected createLanguageClient(connection: MessageConnection | (() => MaybePromise<MessageConnection>)): GLSPClient {
+    protected createLanguageClient(connection: MessageConnection): GLSPClient {
         const clientOptions = this.createOptions();
         return this.languageClientFactory.get(this, clientOptions, connection);
     }
